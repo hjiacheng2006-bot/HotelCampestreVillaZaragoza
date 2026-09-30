@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Gestión de Tienda e Inventario</h2>
+
+<div class="row">
+    
+    <!-- Lado Izquierdo: Inventario de Productos -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span>Inventario Actual</span>
+                <div class="d-flex w-50">
+                    <input type="text" id="buscador" class="form-control form-control-sm me-2" placeholder="🔍 Buscar producto..." onkeyup="filtrarProductos()">
+                    <select id="filtroCategoria" class="form-select form-select-sm" onchange="filtrarProductos()">
+                        <option value="Todas">Todas las categorías</option>
+                        {% for cat, _ in productos | groupby('categoria') %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if productos %}
+                    {% for categoria, items in productos | groupby('categoria') %}
+                    <div class="categoria-section" data-cat-name="{{ categoria }}">
+                        <h5 class="mt-3 p-2 bg-light border-start border-4 border-primary categoria-header">{{ categoria }}</h5>
+                        <table class="table table-striped align-middle mb-4">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%">Producto</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                                <th>Ajustar</th>
+                                <th>Al Carrito</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for producto in items %}
+                            <tr class="producto-row" data-nombre="{{ producto.nombre | lower }}">
+                                <td>
+                                    {{ producto.nombre }}
+                                    {% if session.get('usuario_rol') == 'Administrador' %}
+                                    <form action="{{ url_for('eliminar_producto', id=producto.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este producto de la tienda?');">
+                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0 ms-1 text-decoration-none" title="Eliminar Producto">🗑️</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.get('usuario_rol') == 'Administrador' %}
+                                    <form action="{{ url_for('editar_precio', id=producto.id) }}" method="POST" class="d-flex">
+                                        <div class="input-group input-group-sm" style="width: 110px;">
+                                            <span class="input-group-text p-1">$</span>
+                                            <input type="text" name="nuevo_precio" value="{{ '{:.0f}'.format(producto.precio) }}" class="form-control p-1 format-miles" inputmode="numeric">
+                                            <button type="submit" class="btn btn-outline-success p-1" title="Guardar Precio">💾</button>
+                                        </div>
+                                    </form>
+                                    {% else %}
+                                        $ {{ "{:,.0f}".format(producto.precio).replace(',', '.') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if producto.stock <= 5 %}
+                                        <span class="badge bg-danger fs-6">{{ producto.stock }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success fs-6">{{ producto.stock }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('actualizar_stock', id=producto.id) }}" method="POST" class="d-flex">
+                                        <input type="number" name="nuevo_stock" value="{{ producto.stock }}" min="0" class="form-control form-control-sm me-1" style="width: 70px;">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Guardar">💾</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('agregar_al_carrito', id=producto.id) }}" method="POST" class="d-flex">
+                                        <input type="number" name="cantidad" value="1" min="1" max="{{ producto.stock }}" class="form-control form-control-sm me-2" style="width: 70px;" {% if producto.stock == 0 %}disabled{% endif %}>
+                                        <button type="submit" class="btn btn-sm btn-success" {% if producto.stock == 0 %}disabled{% endif %} title="Agregar al Carrito">➕🛒</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-center text-muted my-4">No hay productos registrados en el inventario.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Lado Derecho: Carrito y Agregar Producto -->
+    <div class="col-md-4">
+        
+        {% if session.get('ultima_venta') %}
+        <div class="mb-3">
+            <a href="{{ url_for('factura_tienda', cuenta_id=session.get('ultima_venta')) }}" target="_blank" class="btn btn-outline-primary w-100 fw-bold fs-5">
+                🖨️ Imprimir Última Venta ({{ session.get('ultima_venta') }})
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Carrito de Compras -->
+        <div class="card mb-4 border-success">
+            <div class="card-header bg-success text-white">
+                🛒 Carrito de Cobro
+            </div>
+            <div class="card-body">
+                {% if carrito %}
+                    <ul class="list-group mb-3">
+                        {% for item in carrito.values() %}
+                        <li class="list-group-item d-flex justify-content-between lh-sm align-items-center p-2">
+                            <div>
+                                <h6 class="my-0">{{ item.nombre }}</h6>
+                                <small class="text-muted">{{ item.cantidad }}x $ {{ "{:,.0f}".format(item.precio).replace(',', '.') }}</small>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted me-2">$ {{ "{:,.0f}".format(item.subtotal).replace(',', '.') }}</span>
+                                <form action="{{ url_for('eliminar_del_carrito', id=item.id) }}" method="POST">
+                                    <button type="submit" class="btn btn-sm btn-link text-danger p-0 text-decoration-none">❌</button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                        <li class="list-group-item d-flex justify-content-between bg-light">
+                            <span>Total (COP)</span>
+                            <strong>$ {{ "{:,.0f}".format(total_carrito).replace(',', '.') }}</strong>
+                        </li>
+                    </ul>
+
+                    <button type="button" class="btn btn-success w-100 fs-5 fw-bold mb-2" data-bs-toggle="modal" data-bs-target="#modalCobrar">
+                        Cobrar Todo 💵
+                    </button>
+                    <form action="{{ url_for('vaciar_carrito') }}" method="POST">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">Vaciar Carrito</button>
+                    </form>
+                {% else %}
+                    <p class="text-center text-muted my-3">El carrito está vacío.</p>
+                    <p class="text-center"><small>Agrega productos desde el inventario usando ➕🛒</small></p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if session.get('usuario_rol') == 'Administrador' %}
+        <!-- Formulario para agregar producto -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                Agregar Nuevo Producto
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('agregar_producto') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del Producto</label>
+                        <input type="text" class="form-control" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoría</label>
+                        <input type="text" class="form-control" name="categoria" list="categorias" value="General" required>
+                        <datalist id="categorias">
+                            <option value="Bebidas">
+                            <option value="Snacks">
+                            <option value="Cuidado Personal">
+                            <option value="General">
+                        </datalist>
+                        <small class="text-muted">Elige o escribe una nueva</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Precio (COP)</label>
+                        <input type="text" class="form-control format-miles" inputmode="numeric" name="precio" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stock Inicial</label>
+                        <input type="number" class="form-control" name="stock" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Registrar Producto</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Modal de Checkout / Pago -->
+<div class="modal fade" id="modalCobrar" tabindex="-1" aria-labelledby="modalCobrarLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-success">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold" id="modalCobrarLabel">Procesar Venta</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('procesar_venta') }}" method="POST">
+          <div class="modal-body">
+              <h4 class="text-center mb-4">Total a Cobrar: <strong class="text-success">$ {{ "{:,.0f}".format(total_carrito).replace(',', '.') }}</strong></h4>
+              
+              <div class="mb-3">
+                  <label class="form-label fw-bold">Método de Pago</label>
+                  <select name="metodo_pago" id="metodoPago" class="form-select form-select-lg" onchange="toggleEfectivo()">
+                      <option value="Efectivo">Efectivo 💵</option>
+                      <option value="Transferencia">Transferencia / Nequi 📱</option>
+                      <option value="Tarjeta">Tarjeta de Crédito / Débito 💳</option>
+                  </select>
+              </div>
+
+              <div id="seccionEfectivo" class="bg-light p-3 rounded">
+                  <label class="form-label fw-bold">¿Con cuánto paga el cliente?</label>
+                  <div class="input-group mb-2">
+                      <span class="input-group-text">$</span>
+                      <input type="text" id="montoRecibido" class="form-control form-control-lg format-miles" inputmode="numeric" placeholder="Ej. 50.000" oninput="calcularDevuelta()">
+                  </div>
+                  <h5 class="mt-3">Devuelta (Cambio): <strong id="devueltaTexto" class="text-primary">$ 0</strong></h5>
+              </div>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-success fw-bold px-4">Confirmar y Cobrar</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+    const totalVenta = {{ total_carrito }};
+    
+    function toggleEfectivo() {
+        const metodo = document.getElementById('metodoPago').value;
+        const seccion = document.getElementById('seccionEfectivo');
+        const inputMonto = document.getElementById('montoRecibido');
+        if (metodo === 'Efectivo') {
+            seccion.style.display = 'block';
+            inputMonto.required = true;
+        } else {
+            seccion.style.display = 'none';
+            inputMonto.required = false;
+        }
+    }
+    
+    function calcularDevuelta() {
+        let valStr = document.getElementById('montoRecibido').value.replace(/\./g, '');
+        const recibido = parseFloat(valStr) || 0;
+        let devuelta = recibido - totalVenta;
+        if (devuelta < 0) devuelta = 0;
+        
+        // Formatear con separador de miles
+        document.getElementById('devueltaTexto').innerText = "$ " + devuelta.toLocaleString('es-CO');
+    }
+    
+    // Inicializar estado al abrir
+    document.getElementById('modalCobrar').addEventListener('show.bs.modal', function () {
+        toggleEfectivo();
+        calcularDevuelta();
+    });
+    // --- Buscador y Filtros ---
+    function filtrarProductos() {
+        const texto = document.getElementById('buscador').value.toLowerCase();
+        const categoria = document.getElementById('filtroCategoria').value;
+        
+        // Guardar estado en sessionStorage
+        sessionStorage.setItem('filtroTexto', document.getElementById('buscador').value);
+        sessionStorage.setItem('filtroCategoria', categoria);
+        
+        // Filtrar
+        document.querySelectorAll('.categoria-section').forEach(section => {
+            const catName = section.getAttribute('data-cat-name');
+            let sectionVisible = false;
+            
+            // Verificar si la categoría coincide
+            if (categoria === 'Todas' || categoria === catName) {
+                // Verificar productos dentro de la categoría
+                section.querySelectorAll('.producto-row').forEach(row => {
+                    const nombre = row.getAttribute('data-nombre');
+                    if (nombre.includes(texto)) {
+                        row.style.display = '';
+                        sectionVisible = true;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            } else {
+                // Ocultar todos los productos de esta sección
+                section.querySelectorAll('.producto-row').forEach(row => row.style.display = 'none');
+            }
+            
+            // Mostrar u ocultar sección completa
+            section.style.display = sectionVisible ? '' : 'none';
+        });
+    }
+
+    // --- Restaurar Estado (Scroll y Filtros) al cargar ---
+    document.addEventListener("DOMContentLoaded", function() {
+        // Restaurar Scroll
+        let scrollpos = sessionStorage.getItem('scrollpos');
+        if (scrollpos) window.scrollTo(0, scrollpos);
+        
+        // Restaurar Filtros
+        let savedTexto = sessionStorage.getItem('filtroTexto');
+        let savedCategoria = sessionStorage.getItem('filtroCategoria');
+        if (savedTexto) document.getElementById('buscador').value = savedTexto;
+        if (savedCategoria) document.getElementById('filtroCategoria').value = savedCategoria;
+        
+        filtrarProductos();
+    });
+
+    window.onbeforeunload = function() {
+        sessionStorage.setItem('scrollpos', window.scrollY);
+    };
+</script>
+
+{% endblock %}

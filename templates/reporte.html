@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Registro Diario de Ingresos</h2>
+    <div class="d-flex align-items-center bg-light p-2 rounded shadow-sm border">
+        <form action="{{ url_for('reporte_dia') }}" method="GET" class="d-flex align-items-center me-3">
+            <label class="me-2 fw-bold text-secondary">Desde:</label>
+            <input type="date" name="fecha_inicio" class="form-control me-2" value="{{ fecha_inicio }}" onchange="this.form.submit()">
+            <label class="me-2 fw-bold text-secondary">Hasta:</label>
+            <input type="date" name="fecha_fin" class="form-control" value="{{ fecha_fin }}" onchange="this.form.submit()">
+        </form>
+        
+        <form action="{{ url_for('reiniciar_dia') }}" method="POST" onsubmit="return confirm('ATENCIÓN: ¿Deseas borrar TODO el historial de base de datos? Esto vaciará ventas, gastos y turnos para siempre.');">
+            <button type="submit" class="btn btn-outline-danger btn-sm" title="Borrar Historial Completo">Limpiar DB 🗑️</button>
+        </form>
+    </div>
+</div>
+
+<!-- Tarjeta de Gran Total -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-success text-white shadow">
+            <div class="card-body d-flex justify-content-between align-items-center p-3">
+                <h3 class="mb-0">Total Recaudado ({{ fecha_inicio }} al {{ fecha_fin }})</h3>
+                <h2 class="mb-0 fw-bold">$ {{ "{:,.0f}".format(gran_total).replace(',', '.') }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Ventas de Tienda -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span class="fs-5">🛒 Ventas de Tienda</span>
+                <span class="fw-bold fs-5">$ {{ "{:,.0f}".format(total_tienda).replace(',', '.') }}</span>
+            </div>
+            <div class="card-body bg-light">
+                {% if ventas %}
+                    <div class="accordion" id="accordionVentas">
+                        {% for cuenta_id, items in ventas | groupby('cuenta_id') %}
+                        {% set total_cuenta = items | sum(attribute='total') %}
+                        <div class="accordion-item mb-2 border">
+                            <h2 class="accordion-header" id="heading-{{ loop.index }}">
+                                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}" aria-expanded="false">
+                                    <strong class="text-primary me-2">{{ cuenta_id }}</strong> 
+                                    <small class="text-muted">{{ items[0].fecha.split()[1][:5] }}</small>
+                                    <span class="ms-auto fw-bold text-success me-2">$ {{ "{:,.0f}".format(total_cuenta).replace(',', '.') }}</span>
+                                    {% if items[0].metodo_pago %}
+                                        <span class="badge bg-info text-dark">{{ items[0].metodo_pago }}</span>
+                                    {% endif %}
+                                </button>
+                            </h2>
+                            <div id="collapse-{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#accordionVentas">
+                                <div class="accordion-body p-0">
+                                    <div class="p-2 bg-white text-end border-bottom d-flex justify-content-end gap-2 align-items-center">
+                                        {% if session.get('usuario_rol') == 'Administrador' %}
+                                        <form action="{{ url_for('anular_factura', cuenta_id=cuenta_id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas ANULAR esta factura? Los productos regresarán al inventario y los cobros de pasadías en esta cuenta serán eliminados.');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Anular Cuenta</button>
+                                        </form>
+                                        {% endif %}
+                                        <a href="{{ url_for('factura_tienda', cuenta_id=cuenta_id) }}" target="_blank" class="btn btn-sm btn-outline-primary">🖨️ Imprimir</a>
+                                    </div>
+                                    <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                                        <thead class="table-secondary">
+                                            <tr>
+                                                <th class="ps-3">Producto</th>
+                                                <th class="text-center">Cant.</th>
+                                                <th class="text-end pe-3">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for venta in items %}
+                                            <tr>
+                                                <td class="ps-3">{{ venta.nombre }}</td>
+                                                <td class="text-center">{{ venta.cantidad }}</td>
+                                                <td class="text-end pe-3">$ {{ "{:,.0f}".format(venta.total).replace(',', '.') }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center text-muted fs-6 mt-3">No hay ventas registradas en la tienda para esta fecha.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingresos por Pasadías -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-info">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <span class="fs-5 fw-bold">🏖️ Ingresos Pasadías</span>
+                <span class="fw-bold fs-5">$ {{ "{:,.0f}".format(total_pasadias).replace(',', '.') }}</span>
+            </div>
+            <div class="card-body bg-light">
+                {% if pasadias %}
+                    <ul class="list-group">
+                        {% for pasadia in pasadias %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center lh-sm p-3 mb-2 border rounded">
+                            <div>
+                                <h6 class="my-0 text-info fw-bold">{{ pasadia.nombre }} <span class="badge bg-secondary ms-2">{{ pasadia.tipo }}</span></h6>
+                                <small class="text-muted">
+                                    {{ pasadia.personas }} Personas 
+                                    {% if pasadia.cumpleanero %}<span class="badge bg-success ms-1">Cumpleañero</span>{% endif %}
+                                </small>
+                                <br><small class="text-muted">Hora: {{ pasadia.fecha.split()[1][:5] }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-success fw-bold fs-5 d-block">$ {{ "{:,.0f}".format(pasadia.total).replace(',', '.') }}</span>
+                                {% if pasadia.metodo_pago %}
+                                    <span class="badge bg-info text-dark d-block mt-1">{{ pasadia.metodo_pago }}</span>
+                                {% endif %}
+                                <a href="{{ url_for('factura_pasadia', id=pasadia.id) }}" target="_blank" class="btn btn-sm btn-outline-info mt-1 p-1" style="font-size: 0.75rem;">🖨️ Imprimir</a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-center text-muted fs-6 mt-3">No hay pasadías registrados para esta fecha.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gastos y Bases de Caja -->
+<div class="row mt-4 mb-5">
+    
+    <!-- Gastos del Día -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-danger">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">📉 Gastos / Salidas Registradas</h5>
+                <span class="fw-bold fs-5">Total Gastos: $ {{ "{:,.0f}".format(total_gastos).replace(',', '.') }}</span>
+            </div>
+            <div class="card-body">
+                {% if gastos %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Hora</th>
+                            <th>Descripción</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gasto in gastos %}
+                        <tr>
+                            <td>{{ gasto.fecha.split()[1][:5] }}</td>
+                            <td>{{ gasto.descripcion }} <br><small class="text-muted">👤 {{ gasto.nombre }}</small></td>
+                            <td class="text-end fw-bold text-danger">$ {{ "{:,.0f}".format(gasto.monto).replace(',', '.') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-center text-muted mb-0">No se han registrado salidas de dinero hoy.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bases de Caja y Turnos -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-warning shadow-sm">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">💵 Turnos y Aperturas de Caja</h5>
+                <span class="fw-bold fs-5 text-dark">Total Bases: $ {{ "{:,.0f}".format(total_bases).replace(',', '.') }}</span>
+            </div>
+            <div class="card-body">
+                {% if turnos %}
+                <table class="table table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Inicio - Fin</th>
+                            <th>Usuario</th>
+                            <th class="text-end">Base Inicial</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for turno in turnos %}
+                        <tr>
+                            <td><small>{{ turno.fecha_inicio.split()[1][:5] }} a <br>{{ turno.fecha_fin.split()[1][:5] if turno.fecha_fin else '??:??' }}</small></td>
+                            <td>👤 {{ turno.nombre }}</td>
+                            <td class="text-end fw-bold text-success">$ {{ "{:,.0f}".format(turno.base_caja).replace(',', '.') }}</td>
+                            <td>
+                                {% if turno.estado == 'Abierto' %}
+                                    <span class="badge bg-success">Abierto</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Cerrado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-center text-muted mb-0">No se ha registrado ningún turno en este periodo.</p>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <ul class="list-group mb-3">
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                            <span>Ingresos (Ventas + Pasadías)</span>
+                            <span class="fw-bold text-success">$ {{ "{:,.0f}".format(gran_total).replace(',', '.') }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                            <span>(-) Gastos y Pagos</span>
+                            <span class="fw-bold text-danger">$ {{ "{:,.0f}".format(total_gastos).replace(',', '.') }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-dark text-white">
+                            <span class="fw-bold">GRAN TOTAL NETO (Ingresos - Gastos)</span>
+                            <span class="fw-bold fs-5">$ {{ "{:,.0f}".format(gran_total_neto).replace(',', '.') }}</span>
+                        </li>
+                    </ul>
+                    
+                    <div class="alert alert-info mb-0 text-center fw-bold fs-5 shadow-sm border-info">
+                        EFECTIVO ESPERADO EN CAJA <br>
+                        <small class="fs-6 fw-normal">(Base Fija + Ingresos Netos)</small><br>
+                        $ {{ "{:,.0f}".format(gran_total_neto + total_bases).replace(',', '.') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

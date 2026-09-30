@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura - {{ recibo_id }}</title>
+    <style>
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 14px; 
+            width: 80mm; /* Ancho estándar de impresora térmica */
+            margin: 0 auto; 
+            padding: 10px; 
+            color: #000; 
+        }
+        .text-center { text-align: center; }
+        .fw-bold { font-weight: bold; }
+        .border-bottom { border-bottom: 1px dashed #000; margin-bottom: 10px; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 4px 0; font-size: 13px; }
+        .text-end { text-align: right; }
+        .btn-volver {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #0d6efd;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+        }
+        @media print {
+            body { width: 100%; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="text-center border-bottom">
+        <h2 style="margin:0; font-size: 18px;">Hotel Campestre Villa Zaragoza</h2>
+        <p style="margin:5px 0;">Recibo de Pago</p>
+        <p style="margin:0; font-size: 12px;">Fecha: {{ fecha }}</p>
+        <p style="margin:0; font-size: 12px;">Ticket: {{ recibo_id }}</p>
+        <p style="margin:0; font-size: 12px;">Atendido por: {{ session.get('usuario_nombre', 'Caja') }}</p>
+    </div>
+
+    <div class="border-bottom">
+        <table>
+            <thead>
+                <tr style="border-bottom: 1px solid #000;">
+                    <th style="width: 15%">Cant</th>
+                    <th style="width: 50%">Descripción</th>
+                    <th class="text-end" style="width: 35%">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td style="vertical-align: top;">{{ item.cant }}</td>
+                    <td>{{ item.desc }}</td>
+                    <td class="text-end" style="vertical-align: top;">${{ "{:,.0f}".format(item.total).replace(',', '.') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="text-end fw-bold" style="font-size: 16px; margin-top: 10px;">
+        TOTAL: ${{ "{:,.0f}".format(total).replace(',', '.') }}
+    </div>
+
+    <div class="text-center" style="margin-top: 20px; font-size: 12px;">
+        <p>¡Gracias por su visita!</p>
+    </div>
+
+    <a href="javascript:history.back()" class="btn-volver no-print">⬅ Volver al sistema</a>
+</body>
+</html>

@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📅 Reservas de Eventos Futuros</h2>
+    <button class="btn btn-primary fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseReserva">
+        + Agendar Nueva Reserva
+    </button>
+</div>
+
+<!-- Formulario para agregar reserva -->
+<div class="collapse mb-4" id="collapseReserva">
+    <div class="card shadow-sm border-primary">
+        <div class="card-header bg-primary text-white fw-bold">
+            Agendar Evento / Hospedaje
+        </div>
+        <div class="card-body bg-light">
+            <form action="{{ url_for('agregar_reserva') }}" method="POST" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">A Nombre de (Cliente)</label>
+                    <input type="text" name="cliente_nombre" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Personas</label>
+                    <input type="number" name="personas" class="form-control" required min="1">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Fecha y Hora</label>
+                    <input type="datetime-local" name="fecha_hora_evento" class="form-control" required>
+                </div>
+                
+                <div class="col-md-12">
+                    <label class="form-label fw-bold">Habitaciones Asignadas (Opcional)</label>
+                    <select name="habitaciones" class="form-select" multiple size="4">
+                        {% for hab in habitaciones %}
+                            <option value="{{ hab.id }}">{{ hab.seccion }} - {{ hab.numero }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Mantén presionado CTRL para seleccionar múltiples habitaciones.</small>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Precio Total (COP)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="text" name="precio_total" class="form-control format-miles" inputmode="numeric" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Abono Entregado (COP)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="text" name="abono" class="form-control format-miles" inputmode="numeric" value="0">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Método de Pago del Abono</label>
+                    <select name="metodo_pago" class="form-select">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                    </select>
+                </div>
+                
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-success fw-bold">Guardar Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Reservas -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="ps-3">Fecha y Hora Evento</th>
+                        <th>Cliente</th>
+                        <th>Personas</th>
+                        <th>Habitaciones</th>
+                        <th>Finanzas</th>
+                        {% if session.get('usuario_rol') == 'Administrador' %}
+                        <th class="text-center" style="width: 80px;">Acción</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reservas %}
+                    <tr>
+                        <td class="ps-3 fw-bold text-primary">{{ r.fecha_hora_evento }}</td>
+                        <td class="fw-bold">{{ r.cliente_nombre }}</td>
+                        <td>👥 {{ r.personas }}</td>
+                        <td>
+                            {% if r.habitaciones %}
+                                <ul class="mb-0 ps-3">
+                                    {% for h in r.habitaciones %}
+                                        <li>{{ h }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-muted">Ninguna</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="d-block">Total: $ {{ "{:,.0f}".format(r.precio_total).replace(',', '.') }}</small>
+                            <small class="d-block text-success">Abono: $ {{ "{:,.0f}".format(r.abono).replace(',', '.') }} ({{ r.metodo_pago }})</small>
+                            <small class="d-block text-danger fw-bold">Saldo: $ {{ "{:,.0f}".format(r.precio_total - r.abono).replace(',', '.') }}</small>
+                        </td>
+                        {% if session.get('usuario_rol') == 'Administrador' %}
+                        <td class="text-center">
+                            <form action="{{ url_for('eliminar_reserva', id=r.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que deseas cancelar y eliminar esta reserva?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Eliminar Reserva">🗑️</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No hay reservas programadas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

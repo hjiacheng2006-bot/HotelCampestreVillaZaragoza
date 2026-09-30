@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Gestión de Usuarios</h2>
+
+<div class="row">
+    <!-- Formulario para agregar usuario -->
+    <div class="col-md-4 mb-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Agregar Nuevo Empleado</h5>
+            </div>
+            <div class="card-body bg-light">
+                <form action="{{ url_for('agregar_usuario') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre Completo</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Número de Cédula</label>
+                        <input type="text" name="cedula" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cargo / Rol</label>
+                        <select name="rol" class="form-select" required>
+                            <option value="Empleado">Empleado</option>
+                            <option value="Administrador">Administrador</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Registrar Usuario</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de usuarios -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Usuarios Registrados</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Cédula</th>
+                            <th>Cargo</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in usuarios %}
+                        <tr>
+                            <td>{{ u.nombre }}</td>
+                            <td>{{ u.cedula }}</td>
+                            <td>
+                                {% if u.rol == 'Administrador' %}
+                                    <span class="badge bg-danger">{{ u.rol }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ u.rol }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.id != session.get('usuario_id') %}
+                                <form action="{{ url_for('eliminar_usuario', id=u.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este usuario?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small">Tú (Sesión Actual)</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

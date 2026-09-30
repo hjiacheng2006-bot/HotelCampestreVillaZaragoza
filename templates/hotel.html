@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Gestión de Hotel y Zonas Comunes</h2>
+
+<!-- Pestañas para separar Habitaciones y Pasadías -->
+<ul class="nav nav-tabs mb-4" id="hotelTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active fw-bold fs-5" id="habitaciones-tab" data-bs-toggle="tab" data-bs-target="#habitaciones" type="button" role="tab" aria-controls="habitaciones" aria-selected="true">🛏️ Habitaciones</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link fw-bold fs-5 text-info" id="pasadias-tab" data-bs-toggle="tab" data-bs-target="#pasadias" type="button" role="tab" aria-controls="pasadias" aria-selected="false">🏖️ Pasadías</button>
+  </li>
+</ul>
+
+<div class="tab-content" id="hotelTabsContent">
+  
+  <!-- SECCIÓN HABITACIONES -->
+  <div class="tab-pane fade show active" id="habitaciones" role="tabpanel" aria-labelledby="habitaciones-tab">
+      
+      <!-- Formulario para agregar nueva habitación -->
+      <div class="row mb-4">
+          <div class="col-md-12">
+              <div class="card border-primary">
+                  <div class="card-body bg-light">
+                      <h5 class="mb-3 text-primary">Agregar Nueva Habitación</h5>
+                      <form action="{{ url_for('agregar_habitacion') }}" method="POST" class="row g-2 align-items-center">
+                          <div class="col-md-3">
+                              <select name="seccion" class="form-select" required>
+                                  <option value="Torre">Habitaciones Torre</option>
+                                  <option value="Casona">Casona Habitaciones</option>
+                              </select>
+                          </div>
+                          <div class="col-md-3">
+                              <select name="acomodacion" class="form-select" required>
+                                  <option value="Pareja">Pareja</option>
+                                  <option value="Familiar">Familiar</option>
+                                  <option value="Múltiple">Múltiple</option>
+                              </select>
+                          </div>
+                          <div class="col-md-3">
+                              <input type="text" name="numero" class="form-control" placeholder="Número o Nombre (ej. 301)" required>
+                          </div>
+                          <div class="col-md-2">
+                              <button type="submit" class="btn btn-primary w-100">Agregar</button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {% for seccion, rooms in habitaciones | groupby('seccion') %}
+      <div class="d-flex align-items-center mb-3 mt-4 border-bottom pb-2">
+          <h4 class="mb-0 text-secondary">
+              {% if seccion == 'Torre' %}🏢 Habitaciones Torre
+              {% elif seccion == 'Áreas Comunes' %}🌳 Áreas Comunes
+              {% else %}🏡 Casona Habitaciones{% endif %}
+          </h4>
+      </div>
+      
+      <div class="row">
+          {% for habitacion in rooms %}
+          <div class="col-md-3 mb-4">
+              {% set estado_class = '' %}
+              {% if habitacion.estado == 'Disponible' %}
+                  {% set estado_class = 'estado-disponible border-success' %}
+              {% elif habitacion.estado == 'En Uso' %}
+                  {% set estado_class = 'estado-en-uso border-danger' %}
+              {% elif habitacion.estado == 'Sucio' %}
+                  {% set estado_class = 'estado-sucio border-warning' %}
+              {% endif %}
+              
+              <div class="card {{ estado_class }} border-2 shadow-sm">
+                  <div class="card-header d-flex justify-content-between align-items-center p-2 bg-white bg-opacity-50">
+                      <span class="fw-bold fs-5">
+                          {% if seccion == 'Áreas Comunes' %}
+                              {{ habitacion.numero }}
+                          {% else %}
+                              Hab. {{ habitacion.numero }}
+                          {% endif %}
+                      </span>
+                      <div>
+                          <button type="button" class="btn btn-sm btn-link text-dark p-0 text-decoration-none" onclick="document.getElementById('edit-form-{{ habitacion.id }}').style.display='flex';" title="Editar Nombre">✏️</button>
+                          <form action="{{ url_for('eliminar_habitacion', id=habitacion.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar esta habitación?');">
+                              <button type="submit" class="btn btn-sm btn-link text-danger p-0 ms-1 text-decoration-none" title="Eliminar Habitación">🗑️</button>
+                          </form>
+                      </div>
+                  </div>
+                  
+                  <div class="card-body text-center">
+                      <!-- Edit Form -->
+                      <form action="{{ url_for('editar_habitacion', id=habitacion.id) }}" method="POST" id="edit-form-{{ habitacion.id }}" style="display: none;" class="mb-3">
+                          <div class="input-group input-group-sm mb-1">
+                              <input type="text" name="numero" class="form-control" value="{{ habitacion.numero }}" required>
+                          </div>
+                          <div class="input-group input-group-sm mb-1">
+                              <select name="acomodacion" class="form-select">
+                                  <option value="Pareja" {% if habitacion.acomodacion == 'Pareja' %}selected{% endif %}>Pareja</option>
+                                  <option value="Familiar" {% if habitacion.acomodacion == 'Familiar' %}selected{% endif %}>Familiar</option>
+                                  <option value="Múltiple" {% if habitacion.acomodacion == 'Múltiple' %}selected{% endif %}>Múltiple</option>
+                              </select>
+                          </div>
+                          <div class="btn-group w-100 mt-1">
+                              <button class="btn btn-sm btn-success" type="submit" title="Guardar">💾 Guardar</button>
+                              <button class="btn btn-sm btn-secondary" type="button" onclick="document.getElementById('edit-form-{{ habitacion.id }}').style.display='none';">Cancelar</button>
+                          </div>
+                      </form>
+
+                      <p class="card-text fw-bold mb-0">{{ habitacion.estado }}</p>
+                      {% if habitacion.cliente_nombre %}
+                          <p class="small text-muted mb-1">👤 {{ habitacion.cliente_nombre }} ({{ habitacion.personas }} pers.)</p>
+                      {% else %}
+                          <div class="mb-1"></div>
+                      {% endif %}
+                      
+                      <!-- Status update form -->
+                      <form action="{{ url_for('actualizar_habitacion', id=habitacion.id) }}" method="POST" id="status-form-{{ habitacion.id }}">
+                          <select name="estado" class="form-select form-select-sm" onchange="handleEstadoChange(this, '{{ habitacion.id }}')">
+                              <option value="Disponible" {% if habitacion.estado == 'Disponible' %}selected{% endif %}>Disponible</option>
+                              <option value="En Uso" {% if habitacion.estado == 'En Uso' %}selected{% endif %}>En Uso</option>
+                              <option value="Sucio" {% if habitacion.estado == 'Sucio' %}selected{% endif %}>Sucio</option>
+                          </select>
+                          <!-- Campos ocultos que se llenarán con el JS si es necesario -->
+                          <input type="hidden" name="cliente_nombre" id="hidden-cliente-{{ habitacion.id }}" value="{{ habitacion.cliente_nombre or '' }}">
+                          <input type="hidden" name="personas" id="hidden-personas-{{ habitacion.id }}" value="{{ habitacion.personas or 0 }}">
+                      </form>
+                  </div>
+              </div>
+          </div>
+          {% endfor %}
+      </div>
+      {% endfor %}
+  </div>
+
+  <!-- SECCIÓN PASADÍAS -->
+  <div class="tab-pane fade" id="pasadias" role="tabpanel" aria-labelledby="pasadias-tab">
+      
+      <!-- Formulario para agregar pasadía -->
+      <div class="row mb-4">
+          <div class="col-md-12">
+              <div class="card border-info">
+                  <div class="card-body bg-light">
+                      <h5 class="mb-3 text-info">Registrar Nueva Entrada / Hospedaje</h5>
+                      <form action="{{ url_for('agregar_pasadia') }}" method="POST" class="row g-2 align-items-center">
+                          <div class="col-md-2">
+                              <select name="tipo" class="form-select" required>
+                                  <option value="Pasadía">Pasadía</option>
+                                  <option value="Piscina">Piscina</option>
+                                  <option value="Hospedaje pareja">Hospedaje pareja</option>
+                                  <option value="Hospedaje persona">Hospedaje persona</option>
+                                  <option value="Hospedaje 3 o más">Hospedaje 3 o más</option>
+                              </select>
+                          </div>
+                          <div class="col-md-3">
+                              <input type="text" name="nombre" class="form-control" placeholder="Nombre (Ej. Familia Pérez)" required>
+                          </div>
+                          <div class="col-md-1">
+                              <input type="number" name="personas" class="form-control px-1" placeholder="Adultos" min="1" required title="Número de Adultos">
+                          </div>
+                          <div class="col-md-2">
+                              <div class="input-group">
+                                  <span class="input-group-text p-1">$</span>
+                                  <input type="text" name="precio_persona" class="form-control px-1 format-miles" inputmode="numeric" placeholder="x Adulto" required>
+                              </div>
+                          </div>
+                          <div class="col-md-1">
+                              <input type="number" name="ninos" class="form-control px-1" placeholder="Niños" min="0" value="0" title="Número de Niños">
+                          </div>
+                          <div class="col-md-2">
+                              <div class="input-group">
+                                  <span class="input-group-text p-1">$</span>
+                                  <input type="text" name="precio_nino" class="form-control px-1 format-miles" inputmode="numeric" placeholder="x Niño" value="0">
+                              </div>
+                          </div>
+                          <div class="col-md-2">
+                              <div class="form-check mt-1">
+                                  <input class="form-check-input" type="checkbox" name="cumpleanero" id="cumpleanero">
+                                  <label class="form-check-label fw-bold text-success" style="font-size: 0.8rem;" for="cumpleanero">
+                                      🎉 Cumpleañero
+                                  </label>
+                              </div>
+                          </div>
+                          <div class="col-md-2 text-end">
+                              <button type="submit" class="btn btn-warning text-dark fw-bold w-100 p-1">🛒 Al Carrito</button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div class="row">
+          {% for pasadia in pasadias %}
+          <div class="col-md-3 mb-4">
+              {% set p_estado_class = 'border-success bg-white' if pasadia.estado == 'Activo' else 'border-secondary bg-light' %}
+              
+              <div class="card border-2 {{ p_estado_class }} h-100">
+                  <div class="card-header d-flex justify-content-between align-items-center p-2">
+                      <div>
+                          <span class="fw-bold text-truncate d-block" title="{{ pasadia.nombre }}">{{ pasadia.nombre }}</span>
+                          <small class="text-muted">{{ pasadia.tipo }}</small>
+                      </div>
+                      <div class="d-flex">
+                          <a href="{{ url_for('factura_pasadia', id=pasadia.id) }}" target="_blank" class="btn btn-sm btn-link text-primary p-0 text-decoration-none" title="Imprimir Recibo">🖨️</a>
+                          {% if session.get('usuario_rol') == 'Administrador' %}
+                          <form action="{{ url_for('eliminar_pasadia', id=pasadia.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');">
+                              <button type="submit" class="btn btn-sm btn-link text-danger p-0 ms-2 text-decoration-none" title="Eliminar">🗑️</button>
+                          </form>
+                          {% endif %}
+                      </div>
+                  </div>
+                  
+                  <div class="card-body text-center d-flex flex-column justify-content-center">
+                      <p class="mb-1 fs-5">👥 <strong>{{ pasadia.personas }}</strong> Personas</p>
+                      {% if pasadia.cumpleanero %}
+                          <span class="badge bg-success mb-2">🎁 Cumpleañero (Aplica -50%)</span>
+                      {% else %}
+                          <div class="mb-2"></div>
+                      {% endif %}
+                      <h4 class="text-primary mb-3">$ {{ "{:,.0f}".format(pasadia.total).replace(',', '.') }}</h4>
+                      
+                      <form action="{{ url_for('actualizar_pasadia', id=pasadia.id) }}" method="POST" class="mt-auto">
+                          <select name="estado" class="form-select form-select-sm {% if pasadia.estado == 'Activo' %}bg-success text-white{% else %}bg-secondary text-white{% endif %}" onchange="this.form.submit()">
+                              <option value="Activo" {% if pasadia.estado == 'Activo' %}selected{% endif %}>🟢 Activo</option>
+                              <option value="Finalizado" {% if pasadia.estado == 'Finalizado' %}selected{% endif %}>⚪ Finalizado</option>
+                          </select>
+                      </form>
+                  </div>
+                  <div class="card-footer text-muted text-center" style="font-size: 0.8rem;">
+                      Ingreso: {{ pasadia.fecha.split()[1][:5] }}
+                  </div>
+              </div>
+          </div>
+          {% else %}
+              <div class="col-12">
+                  <p class="text-center text-muted mt-4">No hay pasadías activos el día de hoy.</p>
+              </div>
+          {% endfor %}
+      </div>
+
+  </div>
+
+</div>
+
+<script>
+function handleEstadoChange(selectElement, habitacionId) {
+    if (selectElement.value === 'En Uso') {
+        let nombre = prompt("Ingresa el nombre del cliente u hospedado:");
+        if (nombre === null || nombre.trim() === '') {
+            // Cancelado por el usuario, revertir select
+            selectElement.value = selectElement.getAttribute('data-old-value') || 'Disponible';
+            return;
+        }
+        let personas = prompt("¿Cuántas personas se hospedan?", "1");
+        if (personas === null) {
+            selectElement.value = selectElement.getAttribute('data-old-value') || 'Disponible';
+            return;
+        }
+        
+        document.getElementById('hidden-cliente-' + habitacionId).value = nombre;
+        document.getElementById('hidden-personas-' + habitacionId).value = personas || 0;
+    }
+    
+    // Guardar el valor anterior por si cancela después
+    selectElement.setAttribute('data-old-value', selectElement.value);
+    
+    // Enviar el formulario
+    document.getElementById('status-form-' + habitacionId).submit();
+}
+
+// Inicializar data-old-value al cargar
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('select[name="estado"]').forEach(select => {
+        select.setAttribute('data-old-value', select.value);
+    });
+});
+</script>
+
+{% endblock %}

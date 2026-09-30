@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Campestre Villa Zaragoza</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .estado-disponible { background-color: #d1e7dd; color: #0f5132; }
+        .estado-en-uso { background-color: #f8d7da; color: #842029; }
+        .estado-sucio { background-color: #fff3cd; color: #664d03; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="/">Hotel Campestre Villa Zaragoza</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            {% if session.get('usuario_id') %}
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'hotel' %}active{% endif %}" href="{{ url_for('hotel') }}">🏨 Gestión de Hotel</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'tienda' %}active{% endif %}" href="{{ url_for('tienda') }}">🛒 Tienda e Inventario</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'gastos' %}active{% endif %}" href="{{ url_for('gastos') }}">💸 Gastos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'reservas' %}active{% endif %}" href="{{ url_for('reservas') }}">📅 Reservas</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes') }}">👥 Clientes</a>
+                </li>
+                {% if session.get('usuario_rol') == 'Administrador' %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'reporte_dia' %}active{% endif %}" href="{{ url_for('reporte_dia') }}">📊 Reporte del Día</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'usuarios' %}active{% endif %}" href="{{ url_for('usuarios') }}">👥 Usuarios</a>
+                </li>
+                {% endif %}
+            </ul>
+            <div class="d-flex align-items-center">
+                {% if turno_activo %}
+                    <span class="badge bg-warning text-dark me-2 fs-6" title="Base inicial del turno">💵 Base: $ {{ "{:,.0f}".format(base_caja_hoy).replace(',', '.') }}</span>
+                    {% if session.get('usuario_rol') == 'Empleado' %}
+                        <span class="badge bg-success me-3 fs-6">Vendido: $ {{ "{:,.0f}".format(gran_total_hoy).replace(',', '.') }}</span>
+                    {% endif %}
+                    <form action="{{ url_for('cerrar_turno') }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que deseas CERRAR este turno? Se registrará la entrega de caja.');">
+                        <button type="submit" class="btn btn-sm btn-danger fw-bold me-3">Cerrar Turno</button>
+                    </form>
+                {% else %}
+                    <button type="button" class="btn btn-sm btn-success fw-bold me-3" data-bs-toggle="modal" data-bs-target="#baseCajaModal">
+                        ▶ Abrir Turno
+                    </button>
+                {% endif %}
+                
+                <span class="text-light me-3">👤 {{ session.get('usuario_nombre') }} ({{ session.get('usuario_rol') }})</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Salir</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<!-- Modal Abrir Turno -->
+<div class="modal fade" id="baseCajaModal" tabindex="-1" aria-labelledby="baseCajaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold" id="baseCajaModalLabel">Apertura de Turno y Caja</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('abrir_turno') }}" method="POST">
+          <div class="modal-body">
+              <p>Ingresa el valor del efectivo inicial en la caja para iniciar tu turno.</p>
+              <div class="input-group mb-3">
+                  <span class="input-group-text">$</span>
+                  <input type="text" name="monto" class="form-control form-control-lg format-miles" required inputmode="numeric" placeholder="Ej. 50.000">
+              </div>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-success fw-bold">Abrir Turno</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-info alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}
+    {% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+{% if session.get('usuario_id') %}
+<script>
+    // Tiempo de carga actual (timestamp)
+    let lastKnownUpdate = {{ config.get('LAST_UPDATE', 0) }};
+    
+    // Función para checar cambios en el servidor
+    function checkUpdates() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.last_update > lastKnownUpdate) {
+                    // Hay un cambio nuevo en la DB, recargamos la página para ver los cambios
+                    console.log("Cambios detectados, recargando página...");
+                    window.location.reload();
+                }
+            })
+            .catch(err => console.log('Error checking updates:', err));
+    }
+    
+    // Checar cada 10 segundos
+    setInterval(checkUpdates, 10000);
+</script>
+{% endif %}
+
+<script>
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('format-miles')) {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val === '') {
+                e.target.value = '';
+                return;
+            }
+            // Add dots as thousand separators
+            e.target.value = parseInt(val, 10).toLocaleString('es-CO').replace(/,/g, '.');
+        }
+    });
+</script>
+
+</body>
+</html>

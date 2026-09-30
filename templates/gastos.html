@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>💸 Módulo de Gastos</h2>
+    <button class="btn btn-danger fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGasto">
+        + Registrar Nuevo Gasto
+    </button>
+</div>
+
+<!-- Formulario para agregar gasto -->
+<div class="collapse mb-4" id="collapseGasto">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white fw-bold">
+            Registrar Salida de Dinero (Pago a Proveedores, Compras, etc.)
+        </div>
+        <div class="card-body bg-light">
+            <form action="{{ url_for('agregar_gasto') }}" method="POST" class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">Descripción del Gasto</label>
+                    <input type="text" name="descripcion" class="form-control" placeholder="Ej. Pago a proveedor Coca-Cola" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Monto (COP)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="text" name="monto" class="form-control format-miles" inputmode="numeric" required>
+                    </div>
+                </div>
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-success fw-bold">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Gastos -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-striped table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-3">Fecha y Hora</th>
+                    <th>Descripción</th>
+                    <th>Registrado por</th>
+                    <th class="text-end pe-4">Monto (COP)</th>
+                    {% if session.get('usuario_rol') == 'Administrador' %}
+                    <th class="text-center" style="width: 80px;">Acción</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for g in gastos %}
+                <tr>
+                    <td class="ps-3">{{ g.fecha }}</td>
+                    <td class="fw-bold">{{ g.descripcion }}</td>
+                    <td>👤 {{ g.nombre if g.nombre else 'Desconocido' }}</td>
+                    <td class="text-end fw-bold text-danger pe-4">$ {{ "{:,.0f}".format(g.monto).replace(',', '.') }}</td>
+                    {% if session.get('usuario_rol') == 'Administrador' %}
+                    <td class="text-center">
+                        <form action="{{ url_for('eliminar_gasto', id=g.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este gasto del registro?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Eliminar Gasto">🗑️</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No hay gastos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
